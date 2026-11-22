@@ -27,6 +27,7 @@
 #include <math.h>
 #include <cstring>
 #include "ENoseLogic.h"
+#include "SensorHealth.h"
 
 // ---- Wi-Fi: replace these, or leave blank to use Serial only ----
 const char* WIFI_SSID = "";
@@ -86,7 +87,8 @@ int calibrationCount = 0;
 float calibrationSum6 = 0.0f;
 float calibrationSum2 = 0.0f;
 int confirmCount = 0;
-int invalidCount = 0;
+enose::SensorHealthMonitor healthMonitor;
+enose::SensorFault activeFault = enose::SensorFault::None;
 
 bool previousButtonRaw = HIGH;
 bool debouncedButton = HIGH;
@@ -164,11 +166,8 @@ void sampleSensors(uint32_t now) {
   mq6mV = readSensorMillivolts(PIN_MQ6);
   mq2mV = readSensorMillivolts(PIN_MQ2);
 
-  bool invalid = !isfinite(mq6mV) || !isfinite(mq2mV) ||
-                 mq6mV < MIN_VALID_SENSOR_MV ||
-                 mq2mV < MIN_VALID_SENSOR_MV;
-  invalidCount = invalid ? min(invalidCount + 1, 5) : 0;
-  sensorFault = (invalidCount >= 5);
+  activeFault = healthMonitor.update(mq6mV, mq2mV);
+  sensorFault = activeFault != enose::SensorFault::None;
 
   if (sensorFault) {
     if (haveBaseline) alarmLatched = true; // Keep a known system fault latched
@@ -214,8 +213,9 @@ void sampleSensors(uint32_t now) {
     }
   }
 
-  Serial.printf("MQ6=%6.0f mV, MQ2=%6.0f mV | base6=%6.0f, base2=%6.0f | %s\n",
-                mq6mV, mq2mV, baseline6mV, baseline2mV, statusText(now));
+  Serial.printf("MQ6=%6.0f mV, MQ2=%6.0f mV | base6=%6.0f, base2=%6.0f | %s | health=%s\n",
+                mq6mV, mq2mV, baseline6mV, baseline2mV, statusText(now),
+                enose::sensorFaultName(activeFault));
 }
 
 void updateIndicators(uint32_t now) {
@@ -286,6 +286,7 @@ void handleAPI() {
   json += ",\"mq2_mV\":" + String(mq2mV, 0);
   json += ",\"alarm\":" + String(alarmLatched ? "true" : "false");
   json += ",\"fault\":" + String(sensorFault ? "true" : "false");
+  json += ",\"fault_reason\":\"" + String(enose::sensorFaultName(activeFault)) + "\"";
   json += "}";
   server.send(200, "application/json", json);
 }
