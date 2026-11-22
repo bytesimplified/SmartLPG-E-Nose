@@ -3,6 +3,7 @@
 
 #include "../firmware/LPG_ENose_ESP32_Kitchen/ENoseLogic.h"
 #include "../firmware/LPG_ENose_ESP32_Kitchen/SensorHealth.h"
+#include "../firmware/LPG_ENose_ESP32_Kitchen/Environment.h"
 
 int main() {
   const enose::Rules r = {
@@ -42,5 +43,16 @@ int main() {
   assert(stuck.update(1000, 1001) == enose::SensorFault::None);
 
   std::cout << "Sensor-rise and sensor-health tests passed (synthetic values only).\\n";
+  // SHT31 is not an MQ gas sensor; CRC protects I2C reading integrity.
+  uint8_t raw[6] = {0x66, 0x66, 0, 0x80, 0x00, 0};
+  raw[2] = enose::sht31Crc(raw, 2);
+  raw[5] = enose::sht31Crc(raw + 3, 2);
+  enose::Environment env = enose::parseSht31(raw, 6);
+  assert(env.valid);
+  assert(env.temperatureC > 24.9f && env.temperatureC < 25.1f);
+  assert(env.humidityPct > 49.9f && env.humidityPct < 50.1f);
+  raw[2] ^= 0x01;
+  assert(!enose::parseSht31(raw, 6).valid);
+  assert(!enose::parseSht31(raw, 5).valid);
   return 0;
 }
