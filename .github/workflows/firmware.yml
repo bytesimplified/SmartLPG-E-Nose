@@ -1,0 +1,36 @@
+name: Prototype firmware checks
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  host-logic:
+    name: C++ sensor-rule tests (synthetic inputs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run C++11 logic tests
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror -pedantic tests/test_logic.cpp -o /tmp/enose-logic-tests
+          /tmp/enose-logic-tests
+
+  esp32-build:
+    name: Compile Arduino sketch for classic ESP32
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+      - name: Install Espressif ESP32 core
+        run: |
+          arduino-cli core update-index --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core install esp32:esp32 --additional-urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+      - name: Compile project
+        run: arduino-cli compile --fqbn esp32:esp32:esp32 firmware/LPG_ENose_ESP32_Kitchen
+
+# Compiling and passing unit tests do NOT validate LPG concentration
+# thresholds, leak sensitivity, installation safety, or field reliability.
