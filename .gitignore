@@ -1,0 +1,16 @@
+# Arduino local state and build outputs
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.d
+build/
+.pio/
+.vscode/
+.DS_Store
+Thumbs.db
+# Local Wi-Fi credentials or private configuration
+secrets.h
+credentials.h
+.env
