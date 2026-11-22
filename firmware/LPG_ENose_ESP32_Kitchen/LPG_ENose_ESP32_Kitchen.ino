@@ -29,6 +29,7 @@
 #include "ENoseLogic.h"
 #include "SensorHealth.h"
 #include "Environment.h"
+#include "DataLogging.h"
 #include "DashboardPage.h"
 #include <Wire.h>
 
@@ -133,13 +134,6 @@ const char* labelText(char c) {
   }
 }
 
-struct Observation {
-  uint32_t uptimeMs;
-  float mq6mV, mq2mV, temperatureC, humidityPct;
-  bool envValid, alarm, fault;
-  const char* status;
-  char label;
-};
 Observation logBuffer[LOG_CAPACITY];
 size_t logNext = 0, logCount = 0;
 
