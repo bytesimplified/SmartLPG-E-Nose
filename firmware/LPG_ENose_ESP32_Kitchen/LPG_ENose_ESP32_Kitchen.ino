@@ -26,6 +26,7 @@
 #include <Preferences.h>
 #include <math.h>
 #include <cstring>
+#include "ENoseLogic.h"
 
 // ---- Wi-Fi: replace these, or leave blank to use Serial only ----
 const char* WIFI_SSID = "";
@@ -107,21 +108,13 @@ float readSensorMillivolts(uint8_t pin) {
 }
 
 bool looksLikeGasRise() {
-  if (!haveBaseline) return false;
-  float delta6 = mq6mV - baseline6mV;
-  float delta2 = mq2mV - baseline2mV;
-
-  bool mq6Strong = mq6mV >= baseline6mV * MQ6_STRONG_RATIO &&
-                   delta6 >= MQ6_STRONG_DELTA_MV;
-  bool mq2Strong = mq2mV >= baseline2mV * MQ2_STRONG_RATIO &&
-                   delta2 >= MQ2_STRONG_DELTA_MV;
-  bool bothRising = mq6mV >= baseline6mV * BOTH_RATIO &&
-                    mq2mV >= baseline2mV * BOTH_RATIO &&
-                    delta6 >= BOTH_DELTA_MV &&
-                    delta2 >= BOTH_DELTA_MV;
-
-  // Do not require both sensors to detect gas: MQ-6 can alarm on its own.
-  return mq6Strong || mq2Strong || bothRising;
+  const enose::Rules rules = {
+    MQ6_STRONG_RATIO, MQ6_STRONG_DELTA_MV,
+    MQ2_STRONG_RATIO, MQ2_STRONG_DELTA_MV,
+    BOTH_RATIO, BOTH_DELTA_MV
+  };
+  return enose::looksLikeGasRise(
+      mq6mV, mq2mV, baseline6mV, baseline2mV, rules);
 }
 
 const char* statusText(uint32_t now) {
