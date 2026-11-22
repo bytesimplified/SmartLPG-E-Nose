@@ -18,6 +18,14 @@ jobs:
           g++ -std=c++11 -Wall -Wextra -Werror -pedantic tests/test_logic.cpp -o /tmp/enose-logic-tests
           /tmp/enose-logic-tests
 
+  python-data-tests:
+    name: Python CSV parsing tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run stdlib unit tests
+        run: python -m unittest discover -s tests -p 'test_*.py'
+
   esp32-build:
     name: Compile Arduino sketch for classic ESP32
     runs-on: ubuntu-latest
