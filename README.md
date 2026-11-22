@@ -34,9 +34,17 @@ Both MQ modules require an appropriate regulated 5 V supply and a common ground.
 
 See [TESTING.md](docs/TESTING.md) for more detail.
 
+## Current research extensions (stacked PR series)
+
+- [Sensor health](docs/SENSOR_HEALTH.md): additional low/near-rail/flatline warnings
+- [Environmental sensing](docs/ENVIRONMENT.md): optional CRC-checked SHT31 readings
+- [CSV data capture](docs/DATA_LOGGING.md): USB data collector and short onboard buffer export
+- [Offline analysis](ml/README.md): session-held-out normal activity classification (NOT LPG alarm logic)
+- [Live dashboard](docs/DASHBOARD.md): charts, annotations, CSV downloads and access configuration
+
 ## Technical and safety limitations
 
-The firmware applies **illustrative relative sensor-voltage thresholds**, not validated LPG-specific concentration measurements. It does not calculate ppm or %LEL. Interfering vapors, humidity, heater drift, power failures, and unrecognized wiring faults can cause missed events or false positives. The web page is LAN-only, lacks authentication, and does not send phone push/SMS alerts. Never use this board for DIY mains switching, gas-valve actuation, or safety interlocks.
+The firmware applies **illustrative relative sensor-voltage thresholds**, not validated LPG-specific concentration measurements. It does not calculate ppm or %LEL. Interfering vapors, humidity, heater drift, power failures, and unrecognized wiring faults can cause missed events or false positives. The web page is opt-in on a trusted LAN, uses Basic authentication without HTTPS (not encrypted end-to-end), and does not send phone push/SMS alerts. Never use this board for DIY mains switching, gas-valve actuation, or safety interlocks.
 
 **DNA sequences are not implemented as physical sensors in this revision.** A DNA-functionalized E-Nose requires fabricated sensing elements and independent experimental validation.
 

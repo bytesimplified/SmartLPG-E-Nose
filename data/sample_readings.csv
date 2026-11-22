@@ -1,0 +1,4 @@
+host_utc,uptime_ms,mq6_mv,mq2_mv,temperature_c,humidity_pct,env_valid,alarm,fault,status,activity_label
+2026-01-01T00:00:00+00:00,1000,850,720,25.50,50.20,1,0,0,MONITORING (PROTOTYPE ONLY),background
+2026-01-01T00:00:01+00:00,2000,880,735,25.55,50.25,1,0,0,MONITORING (PROTOTYPE ONLY),cooking
+2026-01-01T00:00:02+00:00,3000,900,760,,,0,0,0,MONITORING (PROTOTYPE ONLY),unlabeled
