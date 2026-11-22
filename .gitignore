@@ -14,3 +14,12 @@ Thumbs.db
 secrets.h
 credentials.h
 .env
+
+# Python local outputs and research captures
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+ml/output/
+captures/
+enose_capture.csv
