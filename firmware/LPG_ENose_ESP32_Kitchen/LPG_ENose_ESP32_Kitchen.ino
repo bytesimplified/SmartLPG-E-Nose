@@ -136,7 +136,7 @@ String csvRow(const Observation& r) {
   row += "," + String(r.alarm ? "1" : "0");
   row += "," + String(r.fault ? "1" : "0");
   row += "," + String(r.status);
-  row += "," + String(labelText(r.label)) + "\\n";
+  row += "," + String(labelText(r.label)) + "\n";
   return row;
 }
 
@@ -341,7 +341,7 @@ void handleCsv() {
   server.sendHeader("Content-Disposition", "attachment; filename=\"enose_recent.csv\"");
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/csv; charset=utf-8", "");
-  server.sendContent("uptime_ms,mq6_mv,mq2_mv,temperature_c,humidity_pct,env_valid,alarm,fault,status,activity_label\\n");
+  server.sendContent("uptime_ms,mq6_mv,mq2_mv,temperature_c,humidity_pct,env_valid,alarm,fault,status,activity_label\n");
   const size_t first = (logNext + LOG_CAPACITY - logCount) % LOG_CAPACITY;
   for (size_t i = 0; i < logCount; ++i) {
     server.sendContent(csvRow(logBuffer[(first + i) % LOG_CAPACITY]));
