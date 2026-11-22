@@ -29,11 +29,31 @@
 #include "ENoseLogic.h"
 #include "SensorHealth.h"
 #include "Environment.h"
+#include "DashboardPage.h"
 #include <Wire.h>
 
-// ---- Wi-Fi: replace these, or leave blank to use Serial only ----
-const char* WIFI_SSID = "";
-const char* WIFI_PASSWORD = "";
+// Optional local secrets.h is ignored by git. No Wi-Fi without explicit setup.
+#if defined(__has_include)
+#  if __has_include("secrets.h")
+#    include "secrets.h"
+#  endif
+#endif
+#ifndef ENOSE_WIFI_SSID
+#  define ENOSE_WIFI_SSID ""
+#endif
+#ifndef ENOSE_WIFI_PASSWORD
+#  define ENOSE_WIFI_PASSWORD ""
+#endif
+#ifndef ENOSE_DASHBOARD_USER
+#  define ENOSE_DASHBOARD_USER ""
+#endif
+#ifndef ENOSE_DASHBOARD_PASSWORD
+#  define ENOSE_DASHBOARD_PASSWORD ""
+#endif
+const char* WIFI_SSID = ENOSE_WIFI_SSID;
+const char* WIFI_PASSWORD = ENOSE_WIFI_PASSWORD;
+const char* DASHBOARD_USER = ENOSE_DASHBOARD_USER;
+const char* DASHBOARD_PASSWORD = ENOSE_DASHBOARD_PASSWORD;
 
 // ---- Pin mapping (classic ESP32, NOT ESP32-C3/S3) ----
 constexpr uint8_t PIN_MQ6    = 34;
@@ -337,7 +357,22 @@ void updateButton(uint32_t now) {
   }
 }
 
+bool requireDashboardAuth() {
+  // HTTP Basic auth is a convenience gate only; it is not HTTPS.
+  // Refuse to serve sensor data when credentials were not explicitly set.
+  if (strlen(DASHBOARD_USER) == 0 || strlen(DASHBOARD_PASSWORD) < 12) {
+    server.send(503, "text/plain", "Dashboard disabled: configure credentials in secrets.h");
+    return false;
+  }
+  if (!server.authenticate(DASHBOARD_USER, DASHBOARD_PASSWORD)) {
+    server.requestAuthentication();
+    return false;
+  }
+  return true;
+}
+
 void handleCsv() {
+  if (!requireDashboardAuth()) return;
   server.sendHeader("Content-Disposition", "attachment; filename=\"enose_recent.csv\"");
   server.setContentLength(CONTENT_LENGTH_UNKNOWN);
   server.send(200, "text/csv; charset=utf-8", "");
@@ -350,37 +385,17 @@ void handleCsv() {
 }
 
 void handleDashboard() {
-  uint32_t now = millis();
-  String html;
-  html.reserve(1600);
-  html += F("<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>");
-  html += F("<meta http-equiv='refresh' content='3'><title>LPG E-Nose</title>");
-  html += F("<style>body{font-family:system-ui;margin:22px;max-width:550px;background:#f6f7f9}");
-  html += F("article{background:white;padding:20px;border-radius:12px;margin-top:14px}");
-  html += F("h1{font-size:24px}strong{font-size:20px}</style></head><body>");
-  html += F("<h1>Kitchen E-Nose prototype</h1><article><p><strong>");
-  html += statusText(now);
-  html += F("</strong></p><p>MQ-6 signal: ");
-  html += String(mq6mV, 0);
-  html += F(" mV</p><p>MQ-2 signal: ");
-  html += String(mq2mV, 0);
-  html += F(" mV</p><p>MQ-6 baseline: ");
-  html += haveBaseline ? String(baseline6mV, 0) : String("N/A");
-  html += F(" mV</p><p>MQ-2 baseline: ");
-  html += haveBaseline ? String(baseline2mV, 0) : String("N/A");
-  html += F(" mV</p><p>Temperature: ");
-  html += environment.valid ? String(environment.temperatureC, 1) + " &deg;C" : "unavailable";
-  html += F("</p><p>Humidity: ");
-  html += environment.valid ? String(environment.humidityPct, 1) + " %" : "unavailable";
-  html += F("</p></article><p>Refreshes every 3 seconds.</p>");
-  html += F("<p>This is NOT a certified gas alarm. Use a separate certified LPG detector.</p>");
-  html += F("</body></html>");
-  server.send(200, "text/html; charset=utf-8", html);
+  if (!requireDashboardAuth()) return;
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "text/html; charset=utf-8", String(DASHBOARD_PAGE));
 }
 
 void handleAPI() {
+  if (!requireDashboardAuth()) return;
+  server.sendHeader("Cache-Control", "no-store");
   uint32_t now = millis();
   String json = "{\"status\":\"" + String(statusText(now)) + "\"";
+  json += ",\"uptime_ms\":" + String(now);
   json += ",\"mq6_mV\":" + String(mq6mV, 0);
   json += ",\"mq2_mV\":" + String(mq2mV, 0);
   json += ",\"env_valid\":" + String(environment.valid ? "true" : "false");
