@@ -28,6 +28,8 @@
 #include <cstring>
 #include "ENoseLogic.h"
 #include "SensorHealth.h"
+#include "Environment.h"
+#include <Wire.h>
 
 // ---- Wi-Fi: replace these, or leave blank to use Serial only ----
 const char* WIFI_SSID = "";
@@ -40,6 +42,8 @@ constexpr uint8_t PIN_BUZZER = 25;
 constexpr uint8_t PIN_RED    = 26;
 constexpr uint8_t PIN_GREEN  = 27;
 constexpr uint8_t PIN_RESET  = 33;
+constexpr uint8_t SHT31_ADDRESS = 0x44;
+constexpr uint32_t ENV_INTERVAL_MS = 5000;
 
 // A 10k series resistor + 10k to GND means the ADC sees half AO.
 constexpr float AO_TO_ADC_RATIO = 2.0f;
@@ -69,8 +73,12 @@ Preferences prefs;
 
 uint32_t bootAt = 0;
 uint32_t lastSampleAt = 0;
+uint32_t lastEnvAt = 0;
 uint32_t safeSince = 0;
 uint32_t buttonRawChangedAt = 0;
+
+enose::Environment environment;
+bool sht31Present = false;
 
 float mq6mV = 0.0f;                   // Approximate voltage at MQ-6 AO
 float mq2mV = 0.0f;                   // Approximate voltage at MQ-2 AO
@@ -218,6 +226,29 @@ void sampleSensors(uint32_t now) {
                 enose::sensorFaultName(activeFault));
 }
 
+// SHT31: single-shot high repeatability command 0x2400, no clock stretching.
+// A failed environmental reading does NOT silence the independent MQ alert.
+void sampleEnvironment() {
+  Wire.beginTransmission(SHT31_ADDRESS);
+  Wire.write(0x24);
+  Wire.write(0x00);
+  if (Wire.endTransmission() != 0) {
+    environment = enose::Environment{};
+    sht31Present = false;
+    return;
+  }
+  delay(20); // Conversion time for high repeatability
+  uint8_t data[6] = {0};
+  if (Wire.requestFrom(int(SHT31_ADDRESS), 6) != 6) {
+    environment = enose::Environment{};
+    sht31Present = false;
+    return;
+  }
+  for (int i = 0; i < 6; ++i) data[i] = uint8_t(Wire.read());
+  environment = enose::parseSht31(data, 6);
+  sht31Present = environment.valid;
+}
+
 void updateIndicators(uint32_t now) {
   if (sensorFault) {
     // 250 ms pulse every 1.5 seconds, red flashes slowly.
@@ -273,7 +304,11 @@ void handleDashboard() {
   html += haveBaseline ? String(baseline6mV, 0) : String("N/A");
   html += F(" mV</p><p>MQ-2 baseline: ");
   html += haveBaseline ? String(baseline2mV, 0) : String("N/A");
-  html += F(" mV</p></article><p>Refreshes every 3 seconds.</p>");
+  html += F(" mV</p><p>Temperature: ");
+  html += environment.valid ? String(environment.temperatureC, 1) + " &deg;C" : "unavailable";
+  html += F("</p><p>Humidity: ");
+  html += environment.valid ? String(environment.humidityPct, 1) + " %" : "unavailable";
+  html += F("</p></article><p>Refreshes every 3 seconds.</p>");
   html += F("<p>This is NOT a certified gas alarm. Use a separate certified LPG detector.</p>");
   html += F("</body></html>");
   server.send(200, "text/html; charset=utf-8", html);
@@ -284,6 +319,9 @@ void handleAPI() {
   String json = "{\"status\":\"" + String(statusText(now)) + "\"";
   json += ",\"mq6_mV\":" + String(mq6mV, 0);
   json += ",\"mq2_mV\":" + String(mq2mV, 0);
+  json += ",\"env_valid\":" + String(environment.valid ? "true" : "false");
+  json += ",\"temperature_c\":" + (environment.valid ? String(environment.temperatureC, 2) : String("null"));
+  json += ",\"humidity_pct\":" + (environment.valid ? String(environment.humidityPct, 2) : String("null"));
   json += ",\"alarm\":" + String(alarmLatched ? "true" : "false");
   json += ",\"fault\":" + String(sensorFault ? "true" : "false");
   json += ",\"fault_reason\":\"" + String(enose::sensorFaultName(activeFault)) + "\"";
@@ -333,6 +371,7 @@ void setup() {
   digitalWrite(PIN_RED, HIGH);
   digitalWrite(PIN_GREEN, LOW);
 
+  Wire.begin(21, 22); // SHT31: SDA=21, SCL=22; 3.3 V I2C module
   analogReadResolution(12);
   analogSetPinAttenuation(PIN_MQ6, ADC_11db);
   analogSetPinAttenuation(PIN_MQ2, ADC_11db);
@@ -354,6 +393,7 @@ void setup() {
 
   bootAt = millis();
   lastSampleAt = bootAt - SAMPLE_INTERVAL_MS;
+  lastEnvAt = bootAt - ENV_INTERVAL_MS;
   Serial.println("ESP32 LPG E-Nose demo started.");
   Serial.println("Sensor warm-up after restart: 3 minutes.");
   Serial.println("NEW MQ sensors need full initial burn-in per manufacturer.");
@@ -369,6 +409,10 @@ void loop() {
   if ((uint32_t)(now - lastSampleAt) >= SAMPLE_INTERVAL_MS) {
     lastSampleAt = now;
     sampleSensors(now);
+  }
+  if ((uint32_t)(now - lastEnvAt) >= ENV_INTERVAL_MS) {
+    lastEnvAt = now;
+    sampleEnvironment();
   }
   updateIndicators(now);
   updateWiFi();
